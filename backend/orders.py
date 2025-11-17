@@ -12,6 +12,33 @@ try:
 except ImportError:
     email_service = None
 
+def token_required_except_options(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Skip token validation for CORS preflight requests
+        if request.method == 'OPTIONS':
+            return f(None, *args, **kwargs)
+        
+        token = None
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                return jsonify({'error': 'Invalid token format'}), 401
+        
+        if not token:
+            return jsonify({'error': 'Token is missing'}), 401
+        
+        try:
+            data = jwt.decode(token, os.getenv('JWT_SECRET', 'your-secret-key'), algorithms=['HS256'])
+            current_user = data
+        except:
+            return jsonify({'error': 'Token is invalid'}), 401
+        
+        return f(current_user, *args, **kwargs)
+    return decorated
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -55,9 +82,13 @@ def create_orders_bp(app):
     orders_bp = Blueprint('orders', __name__, url_prefix='/api/orders')
     
     # Get all orders for authenticated user
-    @orders_bp.route('/', methods=['GET'])
-    @token_required
+    @orders_bp.route('/', methods=['GET', 'OPTIONS'], strict_slashes=False)
+    @token_required_except_options
     def get_orders(current_user):
+        # Skip processing for CORS preflight
+        if request.method == 'OPTIONS':
+            return '', 200
+        
         try:
             customer_id = current_user['customer_id']
             connection = get_db_connection()
@@ -97,9 +128,13 @@ def create_orders_bp(app):
             return jsonify({'error': 'Failed to fetch orders'}), 500
     
     # Get single order with items
-    @orders_bp.route('/<int:order_id>', methods=['GET'])
-    @token_required
+    @orders_bp.route('/<int:order_id>', methods=['GET', 'OPTIONS'], strict_slashes=False)
+    @token_required_except_options
     def get_order(current_user, order_id):
+        # Skip processing for CORS preflight
+        if request.method == 'OPTIONS':
+            return '', 200
+        
         try:
             customer_id = current_user['customer_id']
             connection = get_db_connection()
@@ -171,9 +206,13 @@ def create_orders_bp(app):
             return jsonify({'error': 'Failed to fetch order'}), 500
     
     # Create order from cart
-    @orders_bp.route('/create', methods=['POST'])
-    @token_required
+    @orders_bp.route('/create', methods=['POST', 'OPTIONS'], strict_slashes=False)
+    @token_required_except_options
     def create_order(current_user):
+        # Skip processing for CORS preflight
+        if request.method == 'OPTIONS':
+            return '', 200
+        
         try:
             customer_id = current_user['customer_id']
             data = request.get_json()
@@ -365,9 +404,13 @@ def create_orders_bp(app):
             return jsonify({'error': str(e)}), 500
     
     # Update order status (admin only)
-    @orders_bp.route('/<int:order_id>/status', methods=['PUT'])
-    @token_required
+    @orders_bp.route('/<int:order_id>/status', methods=['PUT', 'OPTIONS'], strict_slashes=False)
+    @token_required_except_options
     def update_order_status(current_user, order_id):
+        # Skip processing for CORS preflight
+        if request.method == 'OPTIONS':
+            return '', 200
+        
         try:
             # Check if admin
             if not current_user.get('is_admin'):
