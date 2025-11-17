@@ -733,7 +733,7 @@ vercel --prod
 
 ## 📞 Support
 
-For issues or questions, contact: support@shopscale.com
+For issues or questions, contact: gschethan98@gmail.com
 
 ## 📄 License
 
