@@ -6,6 +6,33 @@ import os
 from mysql.connector import Error
 import mysql.connector
 
+def token_required_except_options(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Skip token validation for CORS preflight requests
+        if request.method == 'OPTIONS':
+            return f(None, *args, **kwargs)
+        
+        token = None
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                return jsonify({'error': 'Invalid token format'}), 401
+        
+        if not token:
+            return jsonify({'error': 'Token is missing'}), 401
+        
+        try:
+            data = jwt.decode(token, os.getenv('JWT_SECRET', 'your-secret-key'), algorithms=['HS256'])
+            current_user = data
+        except:
+            return jsonify({'error': 'Token is invalid'}), 401
+        
+        return f(current_user, *args, **kwargs)
+    return decorated
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -49,9 +76,13 @@ def create_addresses_bp(app):
     addresses_bp = Blueprint('addresses', __name__, url_prefix='/api/addresses')
     
     # Get all addresses for authenticated user
-    @addresses_bp.route('/', methods=['GET'])
-    @token_required
+    @addresses_bp.route('/', methods=['GET', 'OPTIONS'], strict_slashes=False)
+    @token_required_except_options
     def get_addresses(current_user):
+        # Skip processing for CORS preflight
+        if request.method == 'OPTIONS':
+            return '', 200
+        
         try:
             customer_id = current_user['customer_id']
             print(f"📦 Fetching addresses for customer {customer_id}")
@@ -85,9 +116,13 @@ def create_addresses_bp(app):
             return jsonify({'error': 'Failed to fetch addresses'}), 500
     
     # Create new address
-    @addresses_bp.route('/', methods=['POST'])
-    @token_required
+    @addresses_bp.route('/', methods=['POST', 'OPTIONS'], strict_slashes=False)
+    @token_required_except_options
     def create_address(current_user):
+        # Skip processing for CORS preflight
+        if request.method == 'OPTIONS':
+            return '', 200
+        
         try:
             data = request.get_json()
             print(f"📦 Creating address for customer {current_user['customer_id']}")
@@ -183,9 +218,13 @@ def create_addresses_bp(app):
             return jsonify({'error': str(e)}), 500
     
     # Update address
-    @addresses_bp.route('/<int:address_id>', methods=['PUT'])
-    @token_required
+    @addresses_bp.route('/<int:address_id>', methods=['PUT', 'OPTIONS'], strict_slashes=False)
+    @token_required_except_options
     def update_address(current_user, address_id):
+        # Skip processing for CORS preflight
+        if request.method == 'OPTIONS':
+            return '', 200
+        
         try:
             data = request.get_json()
             connection = get_db_connection()
@@ -236,9 +275,13 @@ def create_addresses_bp(app):
             return jsonify({'error': 'Failed to update address'}), 500
     
     # Delete address
-    @addresses_bp.route('/<int:address_id>', methods=['DELETE'])
-    @token_required
+    @addresses_bp.route('/<int:address_id>', methods=['DELETE', 'OPTIONS'], strict_slashes=False)
+    @token_required_except_options
     def delete_address(current_user, address_id):
+        # Skip processing for CORS preflight
+        if request.method == 'OPTIONS':
+            return '', 200
+        
         try:
             connection = get_db_connection()
             if not connection:

@@ -14,7 +14,18 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('JWT_SECRET', 'your-secret-key')
-CORS(app)
+
+# Configure CORS properly for all origins and methods
+CORS(app, 
+     resources={r"/api/*": {
+         "origins": ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         "allow_headers": ["Content-Type", "Authorization"],
+         "expose_headers": ["Content-Type"],
+         "supports_credentials": True,
+         "max_age": 3600
+     }}
+)
 
 # Import and register blueprints after app creation to avoid circular imports
 from admin_routes import create_admin_bp
